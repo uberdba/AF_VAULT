@@ -3,6 +3,7 @@ from pyspark.sql.functions import udf, col, count, explode
 from pyspark.ml.feature import Tokenizer, CountVectorizer, IDF
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.sql.types import DoubleType
 
 # COMMAND ----------
 
@@ -11,7 +12,7 @@ df = spark.sql('''
   SELECT reviewText, overall
   FROM amazon_instant_video
   WHERE reviewText != ""
-  LIMIT 20000
+  LIMIT 5000
 ''')
 
 display(df)
@@ -77,12 +78,18 @@ featurized_test_df = count_vectorizer_model.transform(test_df)
 rescaled_test_df = (idf_model.transform(featurized_test_df)
                                 .withColumnRenamed("overall","label")
                                 .select("label", "features"))
-predict_test = lr_fit.transform(rescaled_test_df)
-predict_test.select("label", "prediction").show(10)
+predict_test_df = lr_fit.transform(rescaled_test_df)
+predict_test_df = predict_test_df.withColumn("label", predict_test_df["label"].cast(DoubleType()))
+predict_test_df.select("label", "prediction").show(10)
 
 # COMMAND ----------
 
-# Evaluate predictions - Accuracy
-lr_accuracy = MulticlassClassificationEvaluator(predictionCol="prediction", labelCol="label", 
-                                                metricName="accuracy")
-lr_accuracy.evaluate(predict_test)
+# Evaluate predictions
+evaluator = MulticlassClassificationEvaluator()
+evaluator.setPredictionCol("prediction")
+evaluator.evaluate(predict_test_df, {evaluator.metricName: "accuracy"})
+
+# COMMAND ----------
+
+# Show error as histogram
+pred
